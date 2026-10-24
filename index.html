@@ -78,7 +78,7 @@ function cycleSuggestions(total){suggestionOffset=total>4?(suggestionOffset+4)%t
 async function startSuggestion(fid,memberId){const f=fnById(fid);const patch={status:'IN_PROGRESS'};if(!f?.assignee_member_id)patch.assignee_member_id=memberId;await mutate({action:'update_function',id:fid,patch})}
 function setMyMember(id){localStorage.setItem('myMemberId',id);suggestionOffset=0;render()}
 function navButton(id,label,sub=false){return `<button class="nav ${sub?'sub ':''}${page===id?'active':''}" onclick="go('${id}')">${esc(label)}</button>`}
-function shell(content){const c=counts();return `<div class="top"><div class="brand">GNN SEED LAB</div><div class="title">${esc(titles[page])}</div><div class="badges"><div class="badge"><span class="dot"></span>LIVE WORKSPACE</div><div class="badge">${state.functions.length} FUNCTIONS • PERSISTENT</div></div></div><div class="layout"><aside class="sidebar"><div class="nav-label">PROJECT</div>${navButton('overview','Overview')}${navButton('training','Training')}${navButton('seed','Seed analysis',true)}${navButton('classes','Class analysis',true)}${navButton('nodes','Node stability',true)}${navButton('degree','Degree analysis',true)}${navButton('hyper','Hyperparameters',true)}${navButton('combined','Combined',true)}${navButton('tests','Hypothesis tests',true)}${navButton('plots','Statistical plots',true)}${navButton('visualization','Visualization')}<div class="nav-label" style="margin-top:20px">PROJECT TOOLS</div>${planningPreviewAccess()?navButton('planning','Planning Board · Preview'):''}${navButton('mywork','My Work')}${navButton('dependencies','Dependencies')}${navButton('library','Function library')}${navButton('status','Development status')}${navButton('team','Team & assignments')}<div class="side-footer"><small>ARCHITECTURE</small><strong>${state.functions.length} functions mapped</strong><span>${c.DONE||0} done • ${c.IN_PROGRESS||0} in progress • ${c.VERIFY||0} verify</span></div></aside><main class="main">${content}</main></div>`}
+function shell(content){const c=counts();return `<div class="top"><div class="brand">GNN SEED LAB</div><div class="title">${esc(titles[page])}</div><div class="badges"><div class="badge"><span class="dot"></span>LIVE WORKSPACE</div><div class="badge">${state.functions.length} FUNCTIONS • PERSISTENT</div></div></div><div class="layout"><aside class="sidebar"><div class="nav-label">PROJECT</div>${navButton('overview','Overview')}${navButton('training','Training')}${navButton('seed','Seed analysis',true)}${navButton('classes','Class analysis',true)}${navButton('nodes','Node stability',true)}${navButton('degree','Degree analysis',true)}${navButton('hyper','Hyperparameters',true)}${navButton('combined','Combined',true)}${navButton('tests','Hypothesis tests',true)}${navButton('plots','Statistical plots',true)}${navButton('visualization','Visualization')}<div class="nav-label" style="margin-top:20px">PROJECT TOOLS</div>${navButton('planning','Planning Board')}${navButton('mywork','My Work')}${navButton('dependencies','Dependencies')}${navButton('library','Function library')}${navButton('status','Development status')}${navButton('team','Team & assignments')}<div class="side-footer"><small>ARCHITECTURE</small><strong>${state.functions.length} functions mapped</strong><span>${c.DONE||0} done • ${c.IN_PROGRESS||0} in progress • ${c.VERIFY||0} verify</span></div></aside><main class="main">${content}</main></div>`}
 function head(desc,actions=''){return `<div class="page-head"><div><h1>${esc(titles[page])}</h1><p>${desc}</p></div><div class="actions">${actions}</div></div>`}
 function kpi(label,val,hint){return `<div class="card kpi"><div class="label">${label}</div><div class="value">${val}</div><div class="hint">${hint}</div></div>`}
 function funcCard(f){return `<button class="func" onclick="openDrawer('${f.id}')"><div class="func-top"><span class="func-name">${esc(f.name)}</span><span class="chip ${f.status}">${fmt(f.status)}</span></div><div class="effort-row">${effortBadge(f)}</div>${warningBadge(f)}${f.implementation_notes?.trim()?'<div class="warning-row"><span class="warn-pill" style="color:var(--blue);border-color:rgba(86,168,255,.45)">NOTES SAVED</span></div>':''}<div class="spec"><div class="spec-row"><span class="spec-label">WHAT IT DOES</span><span class="spec-value">${esc(f.what_it_does||f.task||'—')}</span></div><div class="spec-row"><span class="spec-label">INPUT</span><span class="spec-value">${esc(f.input_description||'—')}</span></div><div class="spec-row"><span class="spec-label">OUTPUT</span><span class="spec-value">${esc(f.output_description||'—')}</span></div><div class="spec-row why"><span class="spec-label">WHY WE NEED IT</span><span class="spec-value">${esc(f.rationale||'—')}</span></div>${f.implementation_notes?.trim()?`<div class="spec-row"><span class="spec-label" style="color:var(--blue)">IMPLEMENTATION NOTES</span><span class="spec-value">${esc(f.implementation_notes)}</span></div>`:''}</div><div class="example"><span class="spec-label">EXAMPLE OUTPUT</span><code>${esc(f.example_output||'—')}</code></div><div class="meta"><div class="meta-left"><span>${esc(f.module)}</span><span>${esc(f.category)}</span>${dueText(f)?`<span>Due ${esc(dueText(f))}</span>`:''}</div><div class="meta-right"><strong>${esc(memberName(f.assignee_member_id))}</strong><br>${esc(f.priority||'MEDIUM')} priority</div>${f.source_path?`<div class="path" title="${esc(f.source_path)}">${esc(f.source_path)}</div>`:''}</div></button>`}
@@ -106,17 +106,18 @@ function myWorkPage(){
 
 
 
-function planningPreviewAccess(){return !!localStorage.getItem('gnnPlanningPreviewToken')}
-function planningToken(){return localStorage.getItem('gnnPlanningPreviewToken')||''}
-async function planningLoad(token=planningToken()){
-  const r=await fetch(API+'?api=planning&token='+encodeURIComponent(token),{cache:'no-store'});
-  const j=await r.json();if(!r.ok)throw new Error(j.error||'Planning preview unavailable');
+async function planningLoad(){
+  const r=await fetch(API+'?api=planning',{cache:'no-store'});
+  const j=await r.json();if(!r.ok)throw new Error(j.error||'Planning board unavailable');
   planning.board=j.board;planning.snapshots=j.snapshots||[];planning.dirty=false;planning.saving=false;return j;
 }
 async function planningApi(payload){
-  const r=await fetch(API+'?api=planning',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...payload,token:planningToken()})});
+  const key=localStorage.getItem('gnnAccessKey');
+  if(!key)throw new Error('Unlock workspace editing first');
+  const r=await fetch(API+'?api=planning',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...payload,key})});
   const j=await r.json();if(!r.ok)throw new Error(j.error||'Planning request failed');return j;
 }
+function planningEditable(){return unlocked()}
 function planningData(){
   if(!planning.board) return {version:1,elements:[],strokes:[],connections:[]};
   const d=planning.board.data||{};d.version=d.version||1;d.elements=Array.isArray(d.elements)?d.elements:[];d.strokes=Array.isArray(d.strokes)?d.strokes:[];d.connections=Array.isArray(d.connections)?d.connections:[];planning.board.data=d;return d;
@@ -133,6 +134,7 @@ function planningUpdateSaveState(){
 }
 async function planningSave(showToast=true){
   if(!planning.board||planning.saving)return;
+  if(!planningEditable()){await unlock();if(!planningEditable())return;}
   planning.saving=true;planningUpdateSaveState();
   try{
     await planningApi({action:'save_board',title:planning.board.title||'Future Plans',data:planningData()});
@@ -144,26 +146,26 @@ function planningMode(mode){
   planning.mode=mode;planning.connectingFrom=null;planning.selected=null;render();
   if(mode==='arrow')toast('Select the source item, then the target item');
 }
-function planningAdd(type){
+function planningAdd(type){if(!planningEditable()){toast('Unlock workspace editing to change the board');return}
   const d=planningData(),n=d.elements.filter(e=>e.type===type).length;
   const base={id:planningUid(type),type,x:70+(n%5)*34,y:120+(n%6)*32,w:type==='section'?360:type==='text'?280:240,h:type==='section'?300:type==='text'?130:170,text:type==='section'?'NEW SECTION':type==='text'?'Add planning text…':'New idea…'};
   if(type==='note')base.color=document.querySelector('#planningNoteColor')?.value||'amber';
   d.elements.push(base);planning.selected=base.id;planning.mode='select';planningSetDirty();render();
 }
-function planningAddFunction(){
+function planningAddFunction(){if(!planningEditable()){toast('Unlock workspace editing to change the board');return}
   const sel=document.querySelector('#planningFunctionSelect'),fid=sel?.value;if(!fid){toast('Choose a function to reference');return}
   const d=planningData(),n=d.elements.filter(e=>e.type==='function').length;
   d.elements.push({id:planningUid('function'),type:'function',function_id:fid,x:90+(n%5)*38,y:130+(n%6)*35,w:260,h:112,text:''});
   planningSetDirty();render();
 }
-function planningDelete(id){
+function planningDelete(id){if(!planningEditable())return;
   const d=planningData();d.elements=d.elements.filter(e=>e.id!==id);d.connections=d.connections.filter(c=>c.from!==id&&c.to!==id);
   if(planning.selected===id)planning.selected=null;if(planning.connectingFrom===id)planning.connectingFrom=null;planningSetDirty();render();
 }
-function planningTextChanged(id,value){
+function planningTextChanged(id,value){if(!planningEditable())return;
   const e=planningData().elements.find(x=>x.id===id);if(!e)return;e.text=value;planningSetDirty();
 }
-function planningTitleChanged(value){if(!planning.board)return;planning.board.title=value||'Future Plans';planningSetDirty()}
+function planningTitleChanged(value){if(!planningEditable())return;if(!planning.board)return;planning.board.title=value||'Future Plans';planningSetDirty()}
 function planningElementClick(ev,id){
   if(['TEXTAREA','INPUT','BUTTON','SELECT'].includes(ev.target.tagName))return;
   if(planning.mode==='arrow'){
@@ -176,7 +178,7 @@ function planningElementClick(ev,id){
   }
   planning.selected=id;render();
 }
-function planningDragStart(ev,id){
+function planningDragStart(ev,id){if(!planningEditable())return;
   if(planning.mode!=='select'||ev.button!==0)return;
   const e=planningData().elements.find(x=>x.id===id);if(!e)return;
   planning.selected=id;planning.drag={id,startX:ev.clientX,startY:ev.clientY,x:e.x,y:e.y};ev.preventDefault();ev.stopPropagation();
@@ -190,7 +192,7 @@ function planningDragMove(ev){
 }
 function planningDragEnd(){if(!planning.drag)return;planning.drag=null;planningSetDirty()}
 function planningPoint(ev){const c=document.querySelector('#planningCanvas'),r=c.getBoundingClientRect();return{x:(ev.clientX-r.left)*(1540/r.width),y:(ev.clientY-r.top)*(900/r.height)}}
-function planningCanvasDown(ev){
+function planningCanvasDown(ev){if(!planningEditable())return;
   if(planning.mode!=='draw')return;
   const p=planningPoint(ev);planning.drawing=true;planning.currentStroke={id:planningUid('stroke'),points:[[p.x,p.y]]};
   ev.currentTarget.setPointerCapture?.(ev.pointerId);planningRedrawSvg();ev.preventDefault();
@@ -205,7 +207,7 @@ function planningCanvasUp(){
   if(planning.currentStroke?.points?.length>1)planningData().strokes.push(planning.currentStroke);
   planning.currentStroke=null;planningSetDirty();planningRedrawSvg();
 }
-function planningUndoInk(){
+function planningUndoInk(){if(!planningEditable())return;
   const d=planningData();if(d.strokes.length)d.strokes.pop();else if(d.connections.length)d.connections.pop();else{toast('Nothing to undo');return}planningSetDirty();render();
 }
 function planningClearSelection(){planning.selected=null;planning.connectingFrom=null;render()}
@@ -220,41 +222,42 @@ function planningRedrawSvg(){const svg=document.querySelector('#planningSvg');if
 function planningElementHtml(e){
   const selected=planning.selected===e.id||planning.connectingFrom===e.id?' selected':'';
   const pos='left:'+e.x+'px;top:'+e.y+'px;width:'+e.w+'px;height:'+e.h+'px';
-  if(e.type==='section')return '<div class="planning-element section'+selected+'" data-plan-id="'+e.id+'" style="'+pos+'" onclick="planningElementClick(event,\''+e.id+'\')"><div class="planning-handle" onpointerdown="planningDragStart(event,\''+e.id+'\')"><span class="planning-type">SECTION</span><button class="planning-delete" onclick="event.stopPropagation();planningDelete(\''+e.id+'\')">×</button></div><input class="planning-section-title" value="'+esc(e.text||'SECTION')+'" oninput="planningTextChanged(\''+e.id+'\',this.value)"></div>';
+  if(e.type==='section')return '<div class="planning-element section'+selected+'" data-plan-id="'+e.id+'" style="'+pos+'" onclick="planningElementClick(event,\''+e.id+'\')"><div class="planning-handle" onpointerdown="planningDragStart(event,\''+e.id+'\')"><span class="planning-type">SECTION</span><button class="planning-delete" '+(planningEditable()?'':'disabled')+' onclick="event.stopPropagation();planningDelete(\''+e.id+'\')">×</button></div><input class="planning-section-title" value="'+esc(e.text||'SECTION')+'" '+(planningEditable()?'':'disabled')+' oninput="planningTextChanged(\''+e.id+'\',this.value)"></div>';
   if(e.type==='function'){
     const f=fnById(e.function_id);
-    return '<div class="planning-element function-ref'+selected+'" data-plan-id="'+e.id+'" style="'+pos+'" onclick="planningElementClick(event,\''+e.id+'\')"><div class="planning-handle" onpointerdown="planningDragStart(event,\''+e.id+'\')"><span class="planning-type">FUNCTION REFERENCE</span><button class="planning-delete" onclick="event.stopPropagation();planningDelete(\''+e.id+'\')">×</button></div><div class="planning-function-body"><div class="planning-function-name">'+esc(f?.name||'Missing function')+'</div><div class="planning-function-meta">'+esc(f?.module||'')+' · '+fmt(f?.status||'')+' · '+esc(memberName(f?.assignee_member_id))+'</div></div></div>';
+    return '<div class="planning-element function-ref'+selected+'" data-plan-id="'+e.id+'" style="'+pos+'" onclick="planningElementClick(event,\''+e.id+'\')"><div class="planning-handle" onpointerdown="planningDragStart(event,\''+e.id+'\')"><span class="planning-type">FUNCTION REFERENCE</span><button class="planning-delete" '+(planningEditable()?'':'disabled')+' onclick="event.stopPropagation();planningDelete(\''+e.id+'\')">×</button></div><div class="planning-function-body"><div class="planning-function-name">'+esc(f?.name||'Missing function')+'</div><div class="planning-function-meta">'+esc(f?.module||'')+' · '+fmt(f?.status||'')+' · '+esc(memberName(f?.assignee_member_id))+'</div></div></div>';
   }
   const cls=e.type==='text'?'text-block':'note note-'+(e.color||'amber'),label=e.type==='text'?'TEXT':'STICKY',area=e.type==='text'?'planning-text-area':'planning-note-text';
-  return '<div class="planning-element '+cls+selected+'" data-plan-id="'+e.id+'" style="'+pos+'" onclick="planningElementClick(event,\''+e.id+'\')"><div class="planning-handle" onpointerdown="planningDragStart(event,\''+e.id+'\')"><span class="planning-type">'+label+'</span><button class="planning-delete" onclick="event.stopPropagation();planningDelete(\''+e.id+'\')">×</button></div><textarea class="'+area+'" oninput="planningTextChanged(\''+e.id+'\',this.value)">'+esc(e.text||'')+'</textarea></div>';
+  return '<div class="planning-element '+cls+selected+'" data-plan-id="'+e.id+'" style="'+pos+'" onclick="planningElementClick(event,\''+e.id+'\')"><div class="planning-handle" onpointerdown="planningDragStart(event,\''+e.id+'\')"><span class="planning-type">'+label+'</span><button class="planning-delete" '+(planningEditable()?'':'disabled')+' onclick="event.stopPropagation();planningDelete(\''+e.id+'\')">×</button></div><textarea class="'+area+'" '+(planningEditable()?'':'disabled')+' oninput="planningTextChanged(\''+e.id+'\',this.value)">'+esc(e.text||'')+'</textarea></div>';
 }
-async function planningSnapshot(){
+async function planningSnapshot(){if(!planningEditable()){await unlock();if(!planningEditable())return}
   await planningSave(false);const title=prompt('Snapshot name','Planning '+new Date().toLocaleDateString());if(!title)return;
   try{await planningApi({action:'save_snapshot',title});await planningLoad();render();toast('Snapshot saved')}catch(e){toast(e.message)}
 }
-async function planningRestoreSnapshot(id){
+async function planningRestoreSnapshot(id){if(!planningEditable()){await unlock();if(!planningEditable())return}
   if(!confirm('Restore this snapshot? Current board changes will be replaced.'))return;
   try{await planningApi({action:'restore_snapshot',snapshot_id:id});await planningLoad();render();toast('Snapshot restored')}catch(e){toast(e.message)}
 }
 function planningPage(){
   if(!planning.board)return shell(head('Private planning-board preview.','')+'<div class="empty">Loading private planning board…</div>');
-  const d=planningData();
+  const d=planningData(),canEdit=planningEditable();
   const elements=d.elements.map(planningElementHtml).join('');
   const snapshots=planning.snapshots.map(s=>'<div class="snapshot-item"><span>'+esc(s.title)+' · '+new Date(s.created_at).toLocaleString()+'</span><button class="btn" onclick="planningRestoreSnapshot('+s.id+')">Restore</button></div>').join('');
-  return shell(head('A private visual space for planning future work. Nothing on this board changes function status, assignments, or project code.', '<span class="badge preview-badge">PRIVATE PREVIEW</span>')+
+  return shell(head('A shared visual space for planning future work. Nothing on this board changes function status, assignments, or project code.', '<span class="badge"><span class="dot"></span>SHARED PLANNING</span>')+
     '<div class="planning-toolbar">'+
-      '<button class="btn '+(planning.mode==='select'?'active':'')+'" onclick="planningMode(\'select\')">Select</button>'+
-      '<button class="btn" onclick="planningAdd(\'note\')">+ Sticky</button>'+
-      '<select id="planningNoteColor" class="select"><option value="amber">Amber note</option><option value="cyan">Cyan note</option><option value="violet">Violet note</option><option value="green">Green note</option></select>'+
-      '<button class="btn" onclick="planningAdd(\'text\')">+ Text</button>'+
-      '<button class="btn" onclick="planningAdd(\'section\')">+ Section</button>'+
-      '<button class="btn '+(planning.mode==='draw'?'active':'')+'" onclick="planningMode(\'draw\')">✎ Draw</button>'+
-      '<button class="btn '+(planning.mode==='arrow'?'active':'')+'" onclick="planningMode(\'arrow\')">→ Connect</button>'+
-      '<button class="btn" onclick="planningUndoInk()">Undo ink/arrow</button>'+
-      '<select id="planningFunctionSelect" class="select"><option value="">Reference a function…</option>'+state.functions.map(f=>'<option value="'+f.id+'">'+esc(f.name)+' · '+fmt(f.status)+'</option>').join('')+'</select>'+
-      '<button class="btn" onclick="planningAddFunction()">+ Function</button>'+
-      '<button class="btn" onclick="planningSnapshot()">Save snapshot</button>'+
-      '<button class="btn primary" onclick="planningSave()">Save now</button>'+
+      (canEdit?'<span class="unlocked">● Editing unlocked</span>':'<button class="btn primary" onclick="unlock().then(()=>render())">Unlock editing</button>')+
+      '<button class="btn '+(planning.mode==='select'?'active':'')+'" '+(canEdit?'':'disabled')+' onclick="planningMode(\'select\')">Select</button>'+
+      '<button class="btn" '+(canEdit?'':'disabled')+' onclick="planningAdd(\'note\')">+ Sticky</button>'+
+      '<select id="planningNoteColor" class="select" '+(canEdit?'':'disabled')+'><option value="amber">Amber note</option><option value="cyan">Cyan note</option><option value="violet">Violet note</option><option value="green">Green note</option></select>'+
+      '<button class="btn" '+(canEdit?'':'disabled')+' onclick="planningAdd(\'text\')">+ Text</button>'+
+      '<button class="btn" '+(canEdit?'':'disabled')+' onclick="planningAdd(\'section\')">+ Section</button>'+
+      '<button class="btn '+(planning.mode==='draw'?'active':'')+'" '+(canEdit?'':'disabled')+' onclick="planningMode(\'draw\')">✎ Draw</button>'+
+      '<button class="btn '+(planning.mode==='arrow'?'active':'')+'" '+(canEdit?'':'disabled')+' onclick="planningMode(\'arrow\')">→ Connect</button>'+
+      '<button class="btn" '+(canEdit?'':'disabled')+' onclick="planningUndoInk()">Undo ink/arrow</button>'+
+      '<select id="planningFunctionSelect" class="select" '+(canEdit?'':'disabled')+'><option value="">Reference a function…</option>'+state.functions.map(f=>'<option value="'+f.id+'">'+esc(f.name)+' · '+fmt(f.status)+'</option>').join('')+'</select>'+
+      '<button class="btn" '+(canEdit?'':'disabled')+' onclick="planningAddFunction()">+ Function</button>'+
+      '<button class="btn" '+(canEdit?'':'disabled')+' onclick="planningSnapshot()">Save snapshot</button>'+
+      '<button class="btn primary" '+(canEdit?'':'disabled')+' onclick="planningSave()">Save now</button>'+
       '<span id="planningSaveState" class="planning-save-state '+(planning.dirty?'dirty':'saved')+'">'+(planning.dirty?'Unsaved changes':'Saved')+'</span>'+
     '</div>'+
     '<div class="planning-help"><span><b>Drag</b> items by their header</span><span><b>Draw</b> freehand anywhere</span><span><b>Connect</b> two items with an arrow</span><span><b>Function references</b> are view-only and never change task state</span></div>'+
@@ -265,7 +268,7 @@ function planningPage(){
 
 function teamPage(){const rows=state.members.map(m=>{const fs=state.functions.filter(f=>f.assignee_member_id===m.id);const by=s=>fs.filter(f=>f.status===s).length;return `<tr><td><strong>${esc(m.display_name)}</strong></td><td>${fs.length}</td><td>${by('TODO')}</td><td>${by('IN_PROGRESS')}</td><td>${by('VERIFY')}</td><td>${by('DONE')}</td></tr>`}).join('');return shell(head('Shared assignment view. Assigning TODO/PLANNED work automatically moves it to IN PROGRESS across the whole workspace.',`<button class="btn" onclick="go('mywork')">Open My Work</button><button class="btn primary" onclick="addMember()">+ Add member</button>`)+`<div class="card"><table class="table"><thead><tr><th>MEMBER</th><th>ASSIGNED</th><th>TODO</th><th>IN PROGRESS</th><th>VERIFY</th><th>DONE</th></tr></thead><tbody>${rows}</tbody></table></div><div class="card" style="margin-top:14px"><h3>UNASSIGNED WORK</h3><div class="func-grid">${state.functions.filter(f=>!f.assignee_member_id).slice(0,18).map(funcCard).join('')}</div></div>`)}
 function render(){let body=page==='overview'?overview():page==='planning'?planningPage():page==='mywork'?myWorkPage():page==='dependencies'?dependenciesPage():page==='library'?library():page==='status'?statusPage():page==='team'?teamPage():modulePage();document.querySelector('#app').innerHTML=body}
-async function go(p){if(p==='planning'){if(!planningPreviewAccess()){toast('Planning preview is private');return}if(!planning.board){try{await planningLoad()}catch(e){localStorage.removeItem('gnnPlanningPreviewToken');toast('Planning preview access expired');render();return}}}page=p;selected=null;document.querySelector('#drawer').classList.remove('open');render();scrollTo(0,0)}
+async function go(p){if(p==='planning'&&!planning.board){try{await planningLoad()}catch(e){toast(e.message);return}}page=p;selected=null;document.querySelector('#drawer').classList.remove('open');render();scrollTo(0,0)}
 function unlocked(){return !!localStorage.getItem('gnnAccessKey')}
 async function unlock(){const k=prompt('Enter the shared workspace key');if(!k)return;try{await api({action:'verify_key',key:k});localStorage.setItem('gnnAccessKey',k);toast('Workspace unlocked');if(selected)openDrawer(selected.id,false)}catch(e){toast('Incorrect workspace key')}}
 async function mutate(payload){const key=localStorage.getItem('gnnAccessKey');if(!key){await unlock();if(!localStorage.getItem('gnnAccessKey'))return}try{await api({...payload,key:localStorage.getItem('gnnAccessKey')});await load();toast('Saved')}catch(e){if(/key/i.test(e.message)){localStorage.removeItem('gnnAccessKey')}toast(e.message)}}
@@ -296,5 +299,5 @@ async function saveImplementationNotes(fid){
 function closeDrawer(){document.querySelector('#drawer').classList.remove('open');selected=null}
 async function addComment(fid){const m=document.querySelector('#commentMember').value,b=document.querySelector('#commentBody').value.trim();if(!m||!b){toast('Choose an author and write a comment');return}await mutate({action:'add_comment',function_id:fid,author_member_id:m,body:b})}
 async function addMember(){if(!unlocked()){await unlock();if(!unlocked())return}const n=prompt('Member display name');if(n?.trim())await mutate({action:'add_member',display_name:n.trim()})}
-document.querySelector('#drawer').addEventListener('click',e=>{if(e.target.id==='drawer')closeDrawer()});window.addEventListener('pointermove',planningDragMove);window.addEventListener('pointerup',planningDragEnd);async function boot(){const hash=new URLSearchParams(location.hash.replace(/^#/,'')).get('planning_preview');if(hash){try{await planningLoad(hash);localStorage.setItem('gnnPlanningPreviewToken',hash);page='planning';history.replaceState(null,'',location.pathname+location.search)}catch(e){localStorage.removeItem('gnnPlanningPreviewToken');toast('Private planning preview link is invalid')}}await load()}boot().catch(e=>{document.querySelector('#app').innerHTML='<div class="empty">Failed to load workspace: '+esc(e.message)+'</div>'});setInterval(()=>{if(page!=='planning')load().catch(()=>{})},30000);
+document.querySelector('#drawer').addEventListener('click',e=>{if(e.target.id==='drawer')closeDrawer()});window.addEventListener('pointermove',planningDragMove);window.addEventListener('pointerup',planningDragEnd);async function boot(){await load()}boot().catch(e=>{document.querySelector('#app').innerHTML='<div class="empty">Failed to load workspace: '+esc(e.message)+'</div>'});setInterval(()=>{if(page!=='planning')load().catch(()=>{})},30000);
 </script></body></html>
